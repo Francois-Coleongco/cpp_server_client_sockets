@@ -43,13 +43,13 @@ int main() {
 
   std::array<char, buffer_size> msg_box{0};
 
-  char c = getchar();
-
   size_t msg_char_idx = 1;
 
   std::cout << "starting reader" << std::endl;
   std::thread reader(read_msg, client_sock);
   reader.detach();
+
+  char c = getchar();
 
   while (!feof(stdin)) {
 

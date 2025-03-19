@@ -14,9 +14,14 @@ const size_t buffer_size = 4096;
 std::vector<std::thread> threads;
 std::vector<int> clients;
 
-void forward_to_all(std::array<char, buffer_size> buffer) {
+void forward_to_all(std::array<char, buffer_size> buffer, int sender) {
 
   for (int client_sock : clients) {
+
+    if (client_sock == sender) {
+      continue;
+    }
+
     std::cout << "trying to forward buffer to client_sock: " << client_sock
               << std::endl;
 
@@ -42,10 +47,12 @@ void handle_conn(int client_sock) {
   int bytes_read = 1;
 
   while (bytes_read > 0) {
+    std::cout << "we are going to read from socket id: " << client_sock
+              << std::endl;
     bytes_read = recv(client_sock, &buffer, buffer_size, 0);
     std::cout << bytes_read << std::endl;
     std::cout.write(buffer.data(), buffer_size) << std::endl;
-    forward_to_all(buffer); // copy value cuz buffer could change
+    forward_to_all(buffer, client_sock); // copy value cuz buffer could change
     std::fill(buffer.data(), buffer.data() + buffer_size, '\0');
   }
 }
@@ -106,7 +113,7 @@ int main() {
     }
 
     threads.push_back(std::thread(handle_conn, client_sock));
-		clients.push_back(client_sock);
+    clients.push_back(client_sock);
     ++numConnections;
 
     threads.back().detach();
