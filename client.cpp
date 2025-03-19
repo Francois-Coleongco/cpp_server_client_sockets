@@ -5,7 +5,26 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <thread>
 #include <unistd.h>
+
+const size_t buffer_size = 4096;
+
+void read_msg(int client_sock) {
+
+  std::cout << "called me maybe?" << client_sock << std::endl;
+
+  std::array<char, buffer_size> buffer{0};
+
+  while (true) {
+    int bytes_read = recv(client_sock, &buffer, buffer_size, 0);
+
+    std::cout << "ECHOOO" << std::endl;
+
+    std::cout.write(buffer.data(), buffer_size) << std::endl;
+  }
+  std::fill(buffer.data(), buffer.data() + buffer_size, '\0');
+}
 
 int main() {
 
@@ -28,6 +47,10 @@ int main() {
 
   size_t msg_char_idx = 1;
 
+  std::cout << "starting reader" << std::endl;
+  std::thread reader(read_msg, client_sock);
+  reader.detach();
+
   while (!feof(stdin)) {
 
     if (c == '\n' || msg_char_idx == buffer_size - 1) {
@@ -38,10 +61,8 @@ int main() {
         std::cout << "error sending client hello to server" << std::endl;
       }
 
-      std::fill(buffer.data(), buffer.data() + buffer_size, '\0');
+      std::fill(msg_box.data(), msg_box.data() + buffer_size, '\0');
     }
-
-    std::cout << "thjis was my char c" << c << std::endl;
 
     msg_box[msg_char_idx] = c;
 
