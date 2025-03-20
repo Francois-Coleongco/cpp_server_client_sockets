@@ -4,6 +4,7 @@
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
+#include <string>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
@@ -19,7 +20,9 @@ void read_msg(int client_sock) {
   while (true) {
     int bytes_read = recv(client_sock, &buffer, buffer_size, 0);
 
-    std::cout << "ECHOOO" << std::endl;
+    // problem: cant find out which client it is based onthe client_sock for
+    // some reason
+    std::cout << "ECHOOO in " << client_sock << std::endl;
 
     std::cout.write(buffer.data(), buffer_size) << std::endl;
   }
@@ -49,11 +52,12 @@ int main() {
   std::thread reader(read_msg, client_sock);
   reader.detach();
 
-  char c = getchar();
+  char c;
 
-  while (!feof(stdin)) {
+  while (std::cin >> std::noskipws >> c) {
 
     if (c == '\n' || msg_char_idx == buffer_size - 1) {
+      std::cout << "attempted print" << std::endl;
       // send the message then clear buffer THEN reset msg_char_idx
       int bytes_sent = send(client_sock, &msg_box, sizeof(msg_box), 0);
 
@@ -66,9 +70,9 @@ int main() {
 
     msg_box[msg_char_idx] = c;
 
-    ++msg_char_idx;
+    std::cout << msg_box[msg_char_idx] << std::endl;
 
-    c = getchar();
+    ++msg_char_idx;
   }
 
   close(client_sock);
