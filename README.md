@@ -9,5 +9,17 @@ todo:
 
 need a way to keep track of users. make a sql db of users and passwords ----> the data will contain a username and a password. that is it.
 
-the separate auth program will serve to generate the hash and send it to the db.
+the separate auth program will serve to generate the hash and send it to the db. which i will join together into one binary at the end.
 
+
+so in order to communicate on the port 8080 of the server, the user must log in first.
+
+
+
+
+dependencies:
+
+sqlite33 libsqlite3-dev libsodium-dev
+
+
+must therefore build with respective linking

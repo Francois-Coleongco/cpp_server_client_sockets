@@ -1,0 +1,4 @@
+requires the following libs installable via apt:
+
+
+sqlite33 libsqlite3-dev libsodium-dev
