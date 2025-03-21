@@ -4,7 +4,6 @@
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
-#include <string>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
