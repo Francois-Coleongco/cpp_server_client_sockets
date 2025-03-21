@@ -21,5 +21,6 @@ dependencies:
 
 sqlite33 libsqlite3-dev libsodium-dev
 
-
 must therefore build with respective linking
+
+g++ auth.cpp -l sqlite3 -lsodium

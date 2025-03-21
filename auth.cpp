@@ -115,9 +115,6 @@ bool login(sqlite3 *DB, std::string *username, std::string *password) {
   const unsigned char *password_hash = sqlite3_column_text(stmt, 0);
   std::cerr << password_hash << std::endl;
 
-
-
-
   if (crypto_pwhash_str_verify((const char*)password_hash, password->c_str(),
                                password->length()) != 0) {
     /* wrong password */
