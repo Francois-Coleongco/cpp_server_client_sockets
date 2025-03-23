@@ -1,3 +1,4 @@
+#include "auth.h"
 #include <array>
 #include <cassert>
 #include <cstdio>
@@ -12,6 +13,22 @@
 #include <unistd.h>
 
 const size_t buffer_size = 4096;
+
+
+int send_credentials(int client_sock, unsigned char *client_tx) {
+
+  std::string username;
+  std::string password;
+
+  std::cout << "enter username:" << std::endl;
+  std::cin >> username;
+  std::cout << "enter password:" << std::endl;
+  std::cin >> password;
+
+	// encrypt the username and password and send it over to the server
+
+	return 0;
+}
 
 int crypt_gen(int client_sock, unsigned char *client_pk,
               unsigned char *client_sk, unsigned char *client_rx,
@@ -127,8 +144,9 @@ int main() {
   unsigned char client_rx[crypto_kx_SESSIONKEYBYTES],
       client_tx[crypto_kx_SESSIONKEYBYTES];
 
-  if (crypt_gen(client_sock, client_pk, client_sk, client_rx, client_tx) != 0) {
+  if (crypt_gen(client_sock, client_pk, client_sk, client_rx, client_tx)) {
     std::cerr << "error generating keys :(" << std::endl;
+    return 1;
   }
 
   std::cerr << "this is client_tx" << std::endl;
@@ -137,16 +155,16 @@ int main() {
     printf("%c", client_tx[i]);
   }
 
-  std::cerr << std::endl;
+  if (send_credentials(client_sock, client_tx)) {
+    std::cerr << "couldn't verify credentials" << std::endl;
+  }
 
-  std::cout << std::endl;
+  std::cerr << std::endl;
 
   std::array<char, buffer_size> buffer{0};
 
   std::array<char, buffer_size> msg_box{0};
-  std::array<char, buffer_size> encrypted_msg_box{
-      0}; // first two bytes are size, everything else is space for the
-          // ciphertext
+  std::array<char, buffer_size> encrypted_msg_box{0};
 
   size_t msg_char_idx = 0;
 
@@ -174,7 +192,8 @@ int main() {
           ciphertext[msg_char_idx + crypto_aead_chacha20poly1305_ABYTES];
       unsigned long long ciphertext_len;
 
-      encrypt_buffer(client_tx, &msg_box, msg_char_idx, ciphertext, ciphertext_len);
+      encrypt_buffer(client_tx, &msg_box, msg_char_idx, ciphertext,
+                     ciphertext_len);
 
       int bytes_sent = send(client_sock, &msg_box, sizeof(msg_box), 0);
       msg_char_idx = 0; // set it back to zero for the next message

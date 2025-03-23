@@ -88,7 +88,7 @@ int create_user(sqlite3 *DB, std::string *username, std::string *password) {
   return 0;
 }
 
-bool login(sqlite3 *DB, std::string *username, std::string *password) {
+int login(sqlite3 *DB, std::string *username, std::string *password) {
 
   std::cout << "inside login" << std::endl;
 
@@ -129,7 +129,7 @@ bool login(sqlite3 *DB, std::string *username, std::string *password) {
   return 0;
 }
 
-int main() {
+int confirm_credentials() {
 
   sqlite3 *DB;
 
@@ -150,5 +150,9 @@ int main() {
   std::cout << "enter password:" << std::endl;
   std::cin >> password;
 
-  login(DB, &username, &password);
+  if (login(DB, &username, &password)) {
+		std::cerr << "invalid creds" << std::endl;
+	}
+
+	return 0;
 }
