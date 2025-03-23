@@ -14,6 +14,7 @@ the separate auth program will serve to generate the hash and send it to the db.
 
 so in order to communicate on the port 8080 of the server, the user must log in first.
 
+communications before/during login processes will be done in an encrypted tunnel over port 8888 a key exchange must happen over a different socket than the server's socket for chats. 
 
 
 

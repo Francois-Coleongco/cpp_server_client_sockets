@@ -1,18 +1,72 @@
 #include <array>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <netinet/in.h>
 #include <ostream>
+#include <sodium/crypto_kx.h>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
 #include <vector>
 
 const size_t buffer_size = 4096;
+
 std::vector<std::thread> threads;
 std::vector<int> clients;
+int numConnections = 0;
+
+int crypt_gen(int client_sock, unsigned char *server_pk,
+              unsigned char *server_sk, unsigned char *server_rx,
+              unsigned char *server_tx) {
+
+  /* Generate the server's key pair */
+  crypto_kx_keypair(server_pk, server_sk);
+  std::cerr << "this is server_pk" << std::endl;
+
+  for (int i = 0; i < crypto_kx_PUBLICKEYBYTES; ++i) {
+    printf("%c", server_pk[i]);
+  }
+
+  std::cout << std::endl;
+
+  // send server_pk to client
+
+  send(client_sock, server_pk, crypto_kx_PUBLICKEYBYTES, 0);
+
+  // receive client_pk from client
+
+  unsigned char client_pk[crypto_kx_PUBLICKEYBYTES];
+
+  recv(client_sock, client_pk, crypto_kx_PUBLICKEYBYTES, 0);
+
+  std::cerr << "this is client_pk" << std::endl;
+  for (int i = 0; i < crypto_kx_PUBLICKEYBYTES; ++i) {
+    printf("%c", client_pk[i]);
+  }
+
+  std::cout << std::endl;
+
+  /* Prerequisite after this point: the client's public key must be known by
+   * the server */
+
+  /* Compute two shared keys using the client's public key and the server's
+     secret key. server_rx will be used by the server to receive data from
+     the client, server_tx will be used by the server to send data to the
+     client. */
+
+  if (crypto_kx_server_session_keys(server_rx, server_tx, server_pk, server_sk,
+                                    client_pk) != 0) {
+    std::cerr << "BAILED" << std::endl;
+    /* Suspicious client public key, bail out */
+    return 1;
+  }
+
+  std::cerr << "DIDNT BAIL WE HAVE VALID KEYSSS YAYYY" << std::endl;
+  return 0;
+}
 
 void forward_to_all(std::array<char, buffer_size> buffer, int sender) {
 
@@ -34,7 +88,32 @@ void forward_to_all(std::array<char, buffer_size> buffer, int sender) {
   }
 }
 
+void kill_yourself_listen(char *c, int server_sock) {
+  std::cout << "press q then ENTER to shutdown server" << std::endl;
+  std::cin >> *c;
+  std::cout << "connections spawned: " << numConnections << std::endl;
+  close(server_sock);
+  exit(1);
+}
+
 void handle_conn(int client_sock) {
+
+  unsigned char server_pk[crypto_kx_PUBLICKEYBYTES],
+      server_sk[crypto_kx_SECRETKEYBYTES];
+  unsigned char server_rx[crypto_kx_SESSIONKEYBYTES],
+      server_tx[crypto_kx_SESSIONKEYBYTES];
+
+  if (crypt_gen(client_sock, server_pk, server_sk, server_rx, server_tx)) {
+    std::cerr << "couldn't gen keys :c" << std::endl;
+  }
+
+  std::cerr << "this is server_tx" << std::endl;
+
+  for (int i = 0; i < crypto_kx_SESSIONKEYBYTES; ++i) {
+    printf("%c", server_tx[i]);
+  }
+
+	std::cerr << std::endl;
 
   std::array<char, buffer_size> buffer{0};
 
@@ -98,13 +177,19 @@ int main() {
     close(server_sock);
   }
 
-  int numConnections = 0;
-
   std::cout << "accepting\n";
+
+  char c = '\0';
+
+  std::cout << "kill_yourself_listen" << std::endl;
+
+  // start a thread to listen for 'q'
+  std::thread(kill_yourself_listen, &c, server_sock).detach();
 
   while (true) {
 
     int client_sock = accept(server_sock, nullptr, nullptr);
+
     std::cout << "made another socket: " << client_sock << "\n";
 
     if (client_sock < 0) {
@@ -118,7 +203,4 @@ int main() {
 
     threads.back().detach();
   }
-
-  std::cout << "made em all\n" << "conns: " << numConnections << std::endl;
-  close(server_sock);
 }
