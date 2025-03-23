@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <sodium/crypto_aead_chacha20poly1305.h>
 #include <sodium/crypto_kx.h>
+#include <sodium/randombytes.h>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
@@ -59,6 +60,37 @@ int crypt_gen(int client_sock, unsigned char *client_pk,
   return 0;
 }
 
+int encrypt_buffer(unsigned char *client_tx,
+                   std::array<char, buffer_size> *msg_box, int message_len,
+                   unsigned char *ciphertext,
+                   unsigned long long ciphertext_len) {
+
+  unsigned char nonce[crypto_aead_chacha20poly1305_NPUBBYTES];
+  unsigned char key[crypto_aead_chacha20poly1305_KEYBYTES];
+
+  crypto_aead_chacha20poly1305_keygen(key);
+  randombytes_buf(nonce, sizeof nonce);
+
+  crypto_aead_chacha20poly1305_encrypt(ciphertext, &ciphertext_len,
+                                       (unsigned char *)msg_box->data(),
+                                       message_len, NULL, 0, NULL, nonce, key);
+
+  unsigned char decrypted[message_len];
+
+  unsigned long long decrypted_len;
+  if (crypto_aead_chacha20poly1305_decrypt(decrypted, &decrypted_len, NULL,
+                                           ciphertext, ciphertext_len, NULL, 0,
+                                           nonce, key) != 0) {
+    std::cerr << "MESSAGE FORGED AAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
+    /* message forged! */
+    return 1;
+  } else {
+    std::cerr << "SUCCESSFUL DECRYPTION YAYYYYY" << std::endl;
+  }
+
+  return 0;
+}
+
 void read_msg(int client_sock) {
 
   std::cout << "called me maybe?" << client_sock << std::endl;
@@ -105,15 +137,18 @@ int main() {
     printf("%c", client_tx[i]);
   }
 
-	std::cerr << std::endl;
+  std::cerr << std::endl;
 
   std::cout << std::endl;
 
   std::array<char, buffer_size> buffer{0};
 
   std::array<char, buffer_size> msg_box{0};
+  std::array<char, buffer_size> encrypted_msg_box{
+      0}; // first two bytes are size, everything else is space for the
+          // ciphertext
 
-  size_t msg_char_idx = 1;
+  size_t msg_char_idx = 0;
 
   std::cout << "starting reader" << std::endl;
   std::thread reader(read_msg, client_sock);
@@ -131,10 +166,18 @@ int main() {
       // ciphertext
 
       // must reserve part of the buffer for size of message
+      // note we need to send the size becuase the actual mesasge might contain
+      // the zero byte. therefore we can't just parse till the null byte for
+      // fear of losing data
 
-      // short message_size = encrypt_buffer(client_tx);
+      unsigned char
+          ciphertext[msg_char_idx + crypto_aead_chacha20poly1305_ABYTES];
+      unsigned long long ciphertext_len;
+
+      encrypt_buffer(client_tx, &msg_box, msg_char_idx, ciphertext, ciphertext_len);
 
       int bytes_sent = send(client_sock, &msg_box, sizeof(msg_box), 0);
+      msg_char_idx = 0; // set it back to zero for the next message
 
       if (bytes_sent < 0) {
         std::cout << "error sending client hello to server" << std::endl;
