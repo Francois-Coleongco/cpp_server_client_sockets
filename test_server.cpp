@@ -108,7 +108,7 @@ int verify_creds(int client_sock, unsigned char *server_rx) {
 
   if (crypto_aead_chacha20poly1305_decrypt(
           decrypted_password, &decrypted_password_len, NULL,
-          (unsigned char *)password_buffer.data(), 21, NULL, 0,
+          (unsigned char *)password_buffer.data(), password_bytes_read, NULL, 0,
           nonce, server_rx) != 0) {
 		std::cerr << "this is server_rx" << server_rx << "this is nonce" << nonce << std::endl;
 		std::cerr << "this is the password_buffer" << password_buffer.data() << std::endl;

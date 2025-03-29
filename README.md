@@ -11,10 +11,9 @@ need a way to keep track of users. make a sql db of users and passwords ----> th
 
 the separate auth program will serve to generate the hash and send it to the db. which i will join together into one binary at the end.
 
-
 so in order to communicate on the port 8080 of the server, the user must log in first.
 
-communications before/during login processes will be done in an encrypted tunnel over port 8888 a key exchange must happen over a different socket than the server's socket for chats. 
+sending credentials will be done over an encrypted connection, then further communications will be done with the same keys (on the condition of a successful login)
 
 
 

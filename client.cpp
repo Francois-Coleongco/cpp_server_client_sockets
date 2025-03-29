@@ -1,4 +1,3 @@
-#include "auth.h"
 #include <array>
 #include <cassert>
 #include <cstdio>
@@ -13,22 +12,6 @@
 #include <unistd.h>
 
 const size_t buffer_size = 4096;
-
-
-int send_credentials(int client_sock, unsigned char *client_tx) {
-
-  std::string username;
-  std::string password;
-
-  std::cout << "enter username:" << std::endl;
-  std::cin >> username;
-  std::cout << "enter password:" << std::endl;
-  std::cin >> password;
-
-	// encrypt the username and password and send it over to the server
-
-	return 0;
-}
 
 int crypt_gen(int client_sock, unsigned char *client_pk,
               unsigned char *client_sk, unsigned char *client_rx,
@@ -56,7 +39,11 @@ int crypt_gen(int client_sock, unsigned char *client_pk,
 
   unsigned char server_pk[crypto_kx_PUBLICKEYBYTES];
 
-  recv(client_sock, server_pk, crypto_kx_PUBLICKEYBYTES, 0);
+  int crypto_bytes_read =
+      recv(client_sock, server_pk, crypto_kx_PUBLICKEYBYTES, 0);
+
+  std::cout << "ON THE CLIENT cryptobytesread: " << crypto_bytes_read
+            << std::endl;
 
   std::cerr << "this is server_pk" << std::endl;
 
@@ -77,33 +64,65 @@ int crypt_gen(int client_sock, unsigned char *client_pk,
   return 0;
 }
 
-int encrypt_buffer(unsigned char *client_tx,
-                   std::array<char, buffer_size> *msg_box, int message_len,
-                   unsigned char *ciphertext,
-                   unsigned long long ciphertext_len) {
+int encrypt_buffer(unsigned char *client_tx, unsigned char *msg_box,
+                   int message_len, unsigned char *ciphertext,
+                   unsigned long long *ciphertext_len, int client_sock) {
 
   unsigned char nonce[crypto_aead_chacha20poly1305_NPUBBYTES];
-  unsigned char key[crypto_aead_chacha20poly1305_KEYBYTES];
 
-  crypto_aead_chacha20poly1305_keygen(key);
   randombytes_buf(nonce, sizeof nonce);
 
-  crypto_aead_chacha20poly1305_encrypt(ciphertext, &ciphertext_len,
-                                       (unsigned char *)msg_box->data(),
-                                       message_len, NULL, 0, NULL, nonce, key);
+  send(client_sock, nonce, crypto_aead_chacha20poly1305_NPUBBYTES, 0);
 
-  unsigned char decrypted[message_len];
+  std::cerr << "sent the nonce" << std::endl;
 
-  unsigned long long decrypted_len;
-  if (crypto_aead_chacha20poly1305_decrypt(decrypted, &decrypted_len, NULL,
-                                           ciphertext, ciphertext_len, NULL, 0,
-                                           nonce, key) != 0) {
-    std::cerr << "MESSAGE FORGED AAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
-    /* message forged! */
-    return 1;
-  } else {
-    std::cerr << "SUCCESSFUL DECRYPTION YAYYYYY" << std::endl;
+  crypto_aead_chacha20poly1305_encrypt(ciphertext, ciphertext_len, msg_box,
+                                       message_len, NULL, 0, NULL, nonce,
+                                       client_tx);
+
+  std::cerr << "this is the ciphertext_len" << ciphertext_len << std::endl;
+
+  std::cerr << "okay so i sent with client_tx which is " << client_tx
+            << "and nonce was " << nonce << std::endl;
+
+  return 0;
+}
+
+int send_credentials(int client_sock, unsigned char *client_tx) {
+
+  std::string username;
+  std::string password;
+
+  std::cout << "enter username:" << std::endl;
+  std::cin >> username;
+  std::cout << "enter password:" << std::endl;
+  std::cin >> password;
+
+  // encrypt the username and password and send it over to the server and wait
+  // for a resposne
+
+  unsigned char username_ciphertext[username.length() + 1 +
+                                    crypto_aead_chacha20poly1305_ABYTES];
+  unsigned long long username_ciphertext_len;
+
+  unsigned char password_ciphertext[password.length() + 1 +
+                                    crypto_aead_chacha20poly1305_ABYTES];
+
+  unsigned long long password_ciphertext_len;
+
+  if (encrypt_buffer(client_tx, (unsigned char *)password.data(),
+                     password.length() + 1, password_ciphertext,
+                     &password_ciphertext_len, client_sock)) {
+    std::cerr << "couldn't encrypt error in encrypt_buffer" << std::endl;
   }
+
+  // send(client_sock, username_ciphertext, username_ciphertext_len,
+  //      0); // username
+  // std::cout << "finished sending username" << std::endl;
+	std::cout << "this was my size: " << password_ciphertext_len << std::endl;
+  send(client_sock, password_ciphertext, password_ciphertext_len,
+       0); // username
+  std::cout << "finished sending password" << std::endl;
 
   return 0;
 }
@@ -119,7 +138,7 @@ void read_msg(int client_sock) {
 
     // problem: cant find out which client it is based onthe client_sock for
     // some reason
-    std::cout << "ECHOOO in " << client_sock << std::endl;
+    // std::cout << "ECHOOO in " << client_sock << std::endl;
 
     std::cout.write(buffer.data(), buffer_size) << std::endl;
   }
@@ -155,11 +174,11 @@ int main() {
     printf("%c", client_tx[i]);
   }
 
+  std::cerr << std::endl;
+
   if (send_credentials(client_sock, client_tx)) {
     std::cerr << "couldn't verify credentials" << std::endl;
   }
-
-  std::cerr << std::endl;
 
   std::array<char, buffer_size> buffer{0};
 
@@ -187,13 +206,6 @@ int main() {
       // note we need to send the size becuase the actual mesasge might contain
       // the zero byte. therefore we can't just parse till the null byte for
       // fear of losing data
-
-      unsigned char
-          ciphertext[msg_char_idx + crypto_aead_chacha20poly1305_ABYTES];
-      unsigned long long ciphertext_len;
-
-      encrypt_buffer(client_tx, &msg_box, msg_char_idx, ciphertext,
-                     ciphertext_len);
 
       int bytes_sent = send(client_sock, &msg_box, sizeof(msg_box), 0);
       msg_char_idx = 0; // set it back to zero for the next message
